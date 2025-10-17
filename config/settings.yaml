@@ -1,0 +1,61 @@
+# Digital Waiter Robot Configuration
+# All settings for the robot system
+
+# Audio Configuration
+audio:
+  # ReSpeaker Mic Array v2.0 settings
+  # The ReSpeaker v2.0 is a USB device with 6 channels (factory firmware)
+  # Channel 0: Processed audio for ASR (recommended)
+  # Max sample rate: 16kHz
+  sample_rate: 16000
+  channels: 1  # Use 1 channel (channel 0 - processed audio for ASR)
+  chunk_size: 1024
+  device_name: null  # null = auto-detect ReSpeaker, or specify keyword like "ReSpeaker" or "XMOS"
+  
+  # VAD (Voice Activity Detection) settings
+  silence_threshold: 500  # Amplitude threshold for silence
+  silence_duration: 1.5  # Seconds of silence before stopping recording
+  max_recording_duration: 10  # Maximum seconds to record
+
+# Wake Word Detection
+wake_word:
+  enabled: true
+  model: "hey_jarvis"  # Options: "hey_jarvis", "alexa", "hey_mycroft"
+  threshold: 0.5  # Detection threshold (0.0-1.0, higher = more strict)
+  
+# Speech Recognition (ASR)
+asr:
+  engine: "vosk"  # Offline ASR engine
+  model_path: "models/vosk-model-small-en-us-0.15"
+  language: "en-us"
+
+# Text-to-Speech (TTS)
+tts:
+  engine: "pyttsx3"  # Options: "pyttsx3", "espeak"
+  rate: 150  # Speaking rate (words per minute)
+  volume: 0.9  # Volume (0.0-1.0)
+  voice: null  # null = default, or specify voice ID
+
+# Menu Configuration
+menu:
+  file: "config/menu.yaml"
+  suggestions_enabled: true
+  max_suggestions: 3
+
+# Order Management
+orders:
+  save_directory: "data/orders"
+  file_format: "json"  # Options: "json", "yaml"
+  include_timestamp: true
+
+# Restaurant Information
+restaurant:
+  name: "Robot Cafe"
+  greeting: "Welcome! I'm your digital waiter. Say 'Hey Jarvis' to start ordering."
+  
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "logs/robot.log"
+  console: true
+

@@ -1,0 +1,31 @@
+# Digital Waiter Robot - Python Dependencies
+# All libraries are open-source and suitable for commercial use
+
+# Audio handling
+pyaudio>=0.2.13
+
+# Wake word detection (Apache 2.0)
+openwakeword>=0.5.1
+
+# Speech recognition (Apache 2.0)
+vosk>=0.3.45
+
+# Text-to-speech (MPL 2.0)
+pyttsx3>=2.90
+
+# Configuration and data handling
+PyYAML>=6.0.1
+
+# Scientific computing (for audio processing)
+numpy>=1.24.0
+
+# Optional: For better audio processing on Raspberry Pi
+# Uncomment if needed:
+# webrtcvad>=2.0.10
+# scipy>=1.10.0
+
+# Development dependencies (optional)
+# pytest>=7.4.0
+# black>=23.0.0
+# flake8>=6.0.0
+

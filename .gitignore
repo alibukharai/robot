@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+venv/
+.venv/
+
+# Models (large files)
+models/vosk-*
+models/*.zip
+*.onnx
+*.tflite
+
+# Logs
+logs/
+*.log
+
+# Data
+data/orders/*.json
+data/orders/*.yaml
+*.wav
+*.pcm
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Backups
+*.backup
+*.bak
+.asoundrc.backup
+
+# Documentation builds
+docs/_build/
+

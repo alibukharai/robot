@@ -1,0 +1,112 @@
+# Restaurant Menu Configuration
+# Digital Waiter Robot - Sample Menu
+
+restaurant_info:
+  name: "Robot Cafe"
+  description: "Modern cafe with automated service"
+
+categories:
+  - name: "Appetizers"
+    items:
+      - name: "Spring Rolls"
+        description: "Crispy vegetable spring rolls with sweet chili sauce"
+        price: 6.99
+        popular: true
+        dietary: ["vegetarian"]
+        
+      - name: "Chicken Wings"
+        description: "Spicy buffalo wings with ranch dressing"
+        price: 8.99
+        popular: true
+        dietary: []
+        
+      - name: "Mozzarella Sticks"
+        description: "Golden fried mozzarella with marinara sauce"
+        price: 7.49
+        popular: false
+        dietary: ["vegetarian"]
+
+  - name: "Main Courses"
+    items:
+      - name: "Grilled Chicken"
+        description: "Herb-marinated grilled chicken breast with vegetables"
+        price: 14.99
+        popular: true
+        dietary: ["gluten-free"]
+        
+      - name: "Beef Burger"
+        description: "Angus beef burger with cheese, lettuce, tomato"
+        price: 12.99
+        popular: true
+        dietary: []
+        
+      - name: "Vegetable Pasta"
+        description: "Penne pasta with seasonal vegetables in tomato sauce"
+        price: 11.99
+        popular: false
+        dietary: ["vegetarian"]
+        
+      - name: "Grilled Salmon"
+        description: "Atlantic salmon with lemon butter and asparagus"
+        price: 18.99
+        popular: true
+        dietary: ["gluten-free"]
+        
+      - name: "Margherita Pizza"
+        description: "Classic pizza with tomato, mozzarella, and basil"
+        price: 13.49
+        popular: true
+        dietary: ["vegetarian"]
+
+  - name: "Beverages"
+    items:
+      - name: "Coffee"
+        description: "Freshly brewed coffee"
+        price: 2.99
+        popular: true
+        dietary: ["vegan"]
+        
+      - name: "Tea"
+        description: "Selection of hot teas"
+        price: 2.49
+        popular: false
+        dietary: ["vegan"]
+        
+      - name: "Fresh Orange Juice"
+        description: "Freshly squeezed orange juice"
+        price: 4.49
+        popular: true
+        dietary: ["vegan", "gluten-free"]
+        
+      - name: "Soft Drink"
+        description: "Coca-Cola, Sprite, or Fanta"
+        price: 2.49
+        popular: true
+        dietary: []
+        
+      - name: "Milkshake"
+        description: "Chocolate, vanilla, or strawberry milkshake"
+        price: 5.99
+        popular: true
+        dietary: ["vegetarian"]
+
+  - name: "Desserts"
+    items:
+      - name: "Chocolate Cake"
+        description: "Rich chocolate layer cake"
+        price: 6.99
+        popular: true
+        dietary: ["vegetarian"]
+        
+      - name: "Ice Cream"
+        description: "Three scoops of your choice"
+        price: 4.99
+        popular: true
+        dietary: ["vegetarian", "gluten-free"]
+        
+      - name: "Apple Pie"
+        description: "Classic apple pie with vanilla ice cream"
+        price: 5.99
+        popular: false
+        dietary: ["vegetarian"]
+
