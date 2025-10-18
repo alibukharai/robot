@@ -56,27 +56,36 @@ class WakeWordDetector:
             logger.info("Initializing OpenWakeWord model...")
             
             # Try different initialization methods for compatibility
+            # Start with ONNX as it's more reliable in OpenWakeWord 0.6.0
             try:
-                # Method 1: Default initialization (recommended)
-                self.model = Model()
-                logger.info("✓ Model initialized using default method")
+                # Method 1: Try ONNX framework first (most reliable)
+                logger.info("Trying ONNX inference framework...")
+                self.model = Model(inference_framework='onnx')
+                logger.info("✓ Model initialized using ONNX framework")
             except Exception as e1:
-                logger.warning(f"Default initialization failed: {e1}")
+                logger.warning(f"ONNX initialization failed: {e1}")
                 try:
-                    # Method 2: Specify inference framework explicitly
-                    self.model = Model(inference_framework='onnx')
-                    logger.info("✓ Model initialized using ONNX framework")
+                    # Method 2: Default initialization
+                    logger.info("Trying default initialization...")
+                    self.model = Model()
+                    logger.info("✓ Model initialized using default method")
                 except Exception as e2:
-                    logger.warning(f"ONNX initialization failed: {e2}")
-                    # Method 3: Try TensorFlow Lite if available
+                    logger.warning(f"Default initialization failed: {e2}")
                     try:
+                        # Method 3: Try TensorFlow Lite if available
+                        logger.info("Trying TensorFlow Lite framework...")
                         self.model = Model(inference_framework='tflite')
                         logger.info("✓ Model initialized using TensorFlow Lite framework")
                     except Exception as e3:
                         logger.error(f"All initialization methods failed:")
-                        logger.error(f"  Default: {e1}")
-                        logger.error(f"  ONNX: {e2}")
+                        logger.error(f"  ONNX: {e1}")
+                        logger.error(f"  Default: {e2}")
                         logger.error(f"  TFLite: {e3}")
+                        logger.error("This usually means:")
+                        logger.error("  1. Model files are missing or corrupted")
+                        logger.error("  2. OpenWakeWord version incompatibility")
+                        logger.error("  3. Network issues preventing model download")
+                        logger.error("Try running: python3 fix_openwakeword.py")
                         raise e1  # Raise the original error
                 
             logger.info(f"Wake word detector initialized with target model: {self.model_name}")
