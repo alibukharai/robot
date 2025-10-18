@@ -21,7 +21,7 @@ audio:
 wake_word:
   enabled: true
   model: "hey_jarvis"  # Options: "hey_jarvis", "alexa", "hey_mycroft"
-  threshold: 0.5  # Detection threshold (0.0-1.0, higher = more strict)
+  threshold: 0.3  # Detection threshold (0.0-1.0, higher = more strict)
   
 # Speech Recognition (ASR)
 asr:
