@@ -94,12 +94,18 @@ class SpeechRecognizer:
         try:
             # Process audio data
             if self.recognizer.AcceptWaveform(audio_data):
+                # Complete recognition result
                 result = json.loads(self.recognizer.Result())
+                text = result.get('text', '').strip()
             else:
+                # Partial recognition result
                 result = json.loads(self.recognizer.PartialResult())
+                text = result.get('partial', '').strip()
                 
-            # Extract text from result
-            text = result.get('text', '').strip()
+                # If no partial text, try to get final result
+                if not text:
+                    final_result = json.loads(self.recognizer.FinalResult())
+                    text = final_result.get('text', '').strip()
             
             if text:
                 logger.info(f"Recognized: '{text}'")
