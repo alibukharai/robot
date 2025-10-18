@@ -53,10 +53,33 @@ class WakeWordDetector:
     def _initialize_model(self) -> None:
         """Initialize the OpenWakeWord model."""
         try:
-            # Initialize the model (loads all available models by default)
-            self.model = Model()
+            logger.info("Initializing OpenWakeWord model...")
+            
+            # Try different initialization methods for compatibility
+            try:
+                # Method 1: Default initialization (recommended)
+                self.model = Model()
+                logger.info("✓ Model initialized using default method")
+            except Exception as e1:
+                logger.warning(f"Default initialization failed: {e1}")
+                try:
+                    # Method 2: Specify inference framework explicitly
+                    self.model = Model(inference_framework='onnx')
+                    logger.info("✓ Model initialized using ONNX framework")
+                except Exception as e2:
+                    logger.warning(f"ONNX initialization failed: {e2}")
+                    # Method 3: Try TensorFlow Lite if available
+                    try:
+                        self.model = Model(inference_framework='tflite')
+                        logger.info("✓ Model initialized using TensorFlow Lite framework")
+                    except Exception as e3:
+                        logger.error(f"All initialization methods failed:")
+                        logger.error(f"  Default: {e1}")
+                        logger.error(f"  ONNX: {e2}")
+                        logger.error(f"  TFLite: {e3}")
+                        raise e1  # Raise the original error
                 
-            logger.info(f"Wake word detector initialized with model: {self.model_name}")
+            logger.info(f"Wake word detector initialized with target model: {self.model_name}")
             logger.info(f"Available models: {list(self.model.models.keys())}")
             
             # Verify the requested model is available
@@ -65,11 +88,20 @@ class WakeWordDetector:
                 logger.warning(f"Model '{self.model_name}' not found. Available models: {available_models}")
                 # Use the first available model as fallback
                 if available_models:
+                    old_model = self.model_name
                     self.model_name = available_models[0]
-                    logger.info(f"Using fallback model: {self.model_name}")
+                    logger.info(f"Using fallback model: {self.model_name} (requested: {old_model})")
+                else:
+                    raise RuntimeError("No wake word models are available")
+            
+            logger.info(f"✓ Wake word detector ready with model: {self.model_name}")
             
         except Exception as e:
             logger.error(f"Failed to initialize wake word model: {e}")
+            logger.error("Troubleshooting tips:")
+            logger.error("1. Ensure OpenWakeWord is properly installed: pip install openwakeword")
+            logger.error("2. Check internet connection (models may need to be downloaded)")
+            logger.error("3. Try running: python -c 'from openwakeword.model import Model; Model()'")
             raise
             
     def detect(self, audio_chunk: bytes) -> bool:
