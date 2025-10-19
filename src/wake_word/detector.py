@@ -53,19 +53,20 @@ class WakeWordDetector:
     def _initialize_model(self) -> None:
         """Initialize the OpenWakeWord model."""
         try:
-            # Initialize with specific model or all models
-            if self.model_name:
-                # OpenWakeWord will download the model if not present
-                self.model = Model(
-                    wakeword_models=[self.model_name],
-                    inference_framework="onnx"  # Use ONNX for better Pi performance
-                )
-            else:
-                # Load all available models
-                self.model = Model(inference_framework="onnx")
+            # Initialize the model (loads all available models by default)
+            self.model = Model()
                 
             logger.info(f"Wake word detector initialized with model: {self.model_name}")
             logger.info(f"Available models: {list(self.model.models.keys())}")
+            
+            # Verify the requested model is available
+            if self.model_name and self.model_name not in self.model.models:
+                available_models = list(self.model.models.keys())
+                logger.warning(f"Model '{self.model_name}' not found. Available models: {available_models}")
+                # Use the first available model as fallback
+                if available_models:
+                    self.model_name = available_models[0]
+                    logger.info(f"Using fallback model: {self.model_name}")
             
         except Exception as e:
             logger.error(f"Failed to initialize wake word model: {e}")
@@ -95,11 +96,16 @@ class WakeWordDetector:
             # Get predictions from model
             predictions = self.model.predict(audio_float)
             
-            # Check if any model detected the wake word above threshold
-            for model_name, score in predictions.items():
-                if score >= self.threshold:
-                    logger.info(f"Wake word detected: {model_name} (score: {score:.3f})")
-                    return True
+            # Check if the specific model detected the wake word above threshold
+            # If model_name is specified, only check that model, otherwise check all
+            models_to_check = [self.model_name] if self.model_name in predictions else predictions.keys()
+            
+            for model_name in models_to_check:
+                if model_name in predictions:
+                    score = predictions[model_name]
+                    if score >= self.threshold:
+                        logger.info(f"Wake word detected: {model_name} (score: {score:.3f})")
+                        return True
                     
             return False
             
