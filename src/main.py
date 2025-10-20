@@ -223,6 +223,12 @@ class DigitalWaiterRobot:
         try:
             # Record audio until silence
             audio_config = self.config.get('audio', {})
+            
+            logger.debug(f"Recording with settings: "
+                        f"silence_threshold={audio_config.get('silence_threshold', 500)}, "
+                        f"silence_duration={audio_config.get('silence_duration', 1.5)}s, "
+                        f"max_duration={audio_config.get('max_recording_duration', 10)}s")
+            
             audio_data = self.microphone.record_until_silence(
                 silence_threshold=audio_config.get('silence_threshold', 500),
                 silence_duration=audio_config.get('silence_duration', 1.5),
@@ -230,15 +236,32 @@ class DigitalWaiterRobot:
             )
             
             if audio_data is None:
-                logger.warning("No audio recorded")
+                logger.warning("No audio recorded - possible microphone issue")
+                self.speak("I couldn't hear anything. Please try speaking closer to the microphone.")
                 return None
+                
+            logger.info(f"Recorded {len(audio_data)} bytes of audio data")
+            
+            # Save audio for debugging if enabled
+            if logger.level <= logging.DEBUG:
+                debug_file = self.speech_recognizer.save_audio_for_debug(audio_data)
+                logger.debug(f"Debug audio saved to: {debug_file}")
                 
             # Recognize speech
             text = self.speech_recognizer.recognize(audio_data)
+            
+            if text:
+                logger.info(f"Successfully recognized: '{text}'")
+            else:
+                logger.warning("Speech recognition returned no text")
+                self.speak("I couldn't understand what you said. Please try again.")
+                
             return text
             
         except Exception as e:
             logger.error(f"Error during speech recognition: {e}")
+            logger.debug(f"Error details: ", exc_info=True)
+            self.speak("Sorry, I encountered an error while listening. Please try again.")
             return None
             
     def process_order(self, text: str) -> bool:
@@ -382,7 +405,7 @@ class DigitalWaiterRobot:
         return True
         
     def run(self) -> None:
-        """Run the main robot loop."""
+        """Run the main robot loop with enhanced error handling."""
         logger.info("Starting Digital Waiter Robot...")
         
         # Initialize components
@@ -390,43 +413,77 @@ class DigitalWaiterRobot:
             logger.error("Failed to initialize. Exiting.")
             return
             
-        # Start microphone stream
-        self.microphone.start_stream()
-        self.running = True
-        
-        # Greet customer
-        greeting = self.config.get('restaurant', {}).get(
-            'greeting',
-            "Welcome! Say 'Hey Jarvis' to start ordering."
-        )
-        self.speak(greeting)
-        
-        # Start new order
-        self.order_manager.start_new_order()
-        
         try:
+            # Start microphone stream
+            logger.info("Starting microphone stream...")
+            self.microphone.start_stream()
+            self.running = True
+            
+            # Greet customer
+            greeting = self.config.get('restaurant', {}).get(
+                'greeting',
+                "Welcome! Say 'Hey Jarvis' to start ordering."
+            )
+            self.speak(greeting)
+            
+            # Start new order
+            self.order_manager.start_new_order()
+            
+            # Main loop with error recovery
+            consecutive_errors = 0
+            max_consecutive_errors = 5
+            
             while self.running:
-                # Listen for wake word
-                if self.wake_word_detector:
-                    if not self.listen_for_wake_word():
-                        continue
-                    self.speak("Yes, I'm listening!")
-                
-                # Listen for order
-                text = self.listen_for_order()
-                
-                if text:
-                    # Process the order
-                    self.process_order(text)
+                try:
+                    # Listen for wake word
+                    if self.wake_word_detector:
+                        logger.debug("Listening for wake word...")
+                        if not self.listen_for_wake_word():
+                            continue
+                        logger.info("Wake word detected, proceeding to order listening")
+                        self.speak("Yes, I'm listening!")
                     
-                    # Ask if they want anything else
-                    self.speak("Anything else?")
-                else:
-                    self.speak("I didn't catch that. Please try again.")
+                    # Listen for order
+                    text = self.listen_for_order()
+                    
+                    if text:
+                        # Process the order
+                        logger.info(f"Processing order text: '{text}'")
+                        success = self.process_order(text)
+                        
+                        if success:
+                            # Ask if they want anything else
+                            self.speak("Anything else?")
+                            consecutive_errors = 0  # Reset error counter
+                        else:
+                            self.speak("I had trouble processing that order. Please try again.")
+                    else:
+                        self.speak("I didn't catch that. Please speak clearly and try again.")
+                        
+                except Exception as e:
+                    consecutive_errors += 1
+                    logger.error(f"Error in main loop (#{consecutive_errors}): {e}")
+                    logger.debug("Main loop error details:", exc_info=True)
+                    
+                    if consecutive_errors >= max_consecutive_errors:
+                        logger.error(f"Too many consecutive errors ({consecutive_errors}). Stopping.")
+                        self.speak("I'm experiencing technical difficulties. Please restart the system.")
+                        break
+                    
+                    # Try to recover
+                    self.speak("Sorry, I encountered an error. Let me try again.")
+                    
+                    # Wait a bit before retrying
+                    import time
+                    time.sleep(1)
                     
         except KeyboardInterrupt:
             logger.info("Interrupted by user")
+        except Exception as e:
+            logger.error(f"Fatal error in robot main loop: {e}")
+            logger.debug("Fatal error details:", exc_info=True)
         finally:
+            logger.info("Shutting down robot...")
             self.stop()
             
     def stop(self) -> None:

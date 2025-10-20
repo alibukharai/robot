@@ -54,22 +54,49 @@ class WakeWordDetector:
         """Initialize the OpenWakeWord model."""
         try:
             # Initialize the model (loads all available models by default)
+            logger.info("Loading OpenWakeWord models...")
             self.model = Model()
-                
-            logger.info(f"Wake word detector initialized with model: {self.model_name}")
-            logger.info(f"Available models: {list(self.model.models.keys())}")
+            
+            available_models = list(self.model.models.keys())
+            logger.info(f"Available wake word models: {available_models}")
             
             # Verify the requested model is available
             if self.model_name and self.model_name not in self.model.models:
-                available_models = list(self.model.models.keys())
-                logger.warning(f"Model '{self.model_name}' not found. Available models: {available_models}")
-                # Use the first available model as fallback
-                if available_models:
+                logger.warning(f"Requested model '{self.model_name}' not found.")
+                
+                # Try common model name variations
+                model_variations = [
+                    self.model_name,
+                    self.model_name.lower(),
+                    self.model_name.replace('_', ' '),
+                    self.model_name.replace(' ', '_'),
+                ]
+                
+                found_model = None
+                for variation in model_variations:
+                    for available_model in available_models:
+                        if variation.lower() in available_model.lower():
+                            found_model = available_model
+                            break
+                    if found_model:
+                        break
+                
+                if found_model:
+                    self.model_name = found_model
+                    logger.info(f"Using similar model: {self.model_name}")
+                elif available_models:
+                    # Use the first available model as fallback
                     self.model_name = available_models[0]
                     logger.info(f"Using fallback model: {self.model_name}")
+                else:
+                    raise RuntimeError("No wake word models available")
+            
+            logger.info(f"Wake word detector initialized with model: {self.model_name}")
+            logger.info(f"Detection threshold: {self.threshold}")
             
         except Exception as e:
             logger.error(f"Failed to initialize wake word model: {e}")
+            logger.error("Try installing models with: pip install --upgrade openwakeword")
             raise
             
     def detect(self, audio_chunk: bytes) -> bool:
@@ -86,29 +113,67 @@ class WakeWordDetector:
             logger.error("Model not initialized")
             return False
             
+        if not audio_chunk or len(audio_chunk) == 0:
+            logger.debug("Empty audio chunk provided")
+            return False
+            
         try:
             # Convert bytes to numpy array (int16)
             audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
             
+            # Check if we have enough data
+            if len(audio_data) == 0:
+                logger.debug("No audio data after conversion")
+                return False
+            
             # OpenWakeWord expects float32 normalized to [-1, 1]
             audio_float = audio_data.astype(np.float32) / 32768.0
+            
+            # Ensure we have the right shape
+            if audio_float.ndim != 1:
+                logger.error(f"Expected 1D audio, got shape: {audio_float.shape}")
+                return False
             
             # Get predictions from model
             predictions = self.model.predict(audio_float)
             
-            # Check if the specific model detected the wake word above threshold
-            # If model_name is specified, only check that model, otherwise check all
-            models_to_check = [self.model_name] if self.model_name in predictions else predictions.keys()
+            if not predictions:
+                logger.debug("No predictions returned from model")
+                return False
             
-            for model_name in models_to_check:
-                if model_name in predictions:
-                    score = predictions[model_name]
+            # Check predictions
+            max_score = 0.0
+            best_model = None
+            
+            # If we have a specific model name, prioritize it
+            if self.model_name and self.model_name in predictions:
+                score = predictions[self.model_name]
+                if score >= self.threshold:
+                    logger.info(f"Wake word detected: {self.model_name} (score: {score:.3f})")
+                    return True
+                max_score = max(max_score, score)
+                best_model = self.model_name
+            else:
+                # Check all available models
+                for model_name, score in predictions.items():
+                    if score > max_score:
+                        max_score = score
+                        best_model = model_name
+                    
                     if score >= self.threshold:
                         logger.info(f"Wake word detected: {model_name} (score: {score:.3f})")
                         return True
+            
+            # Log the best score for debugging
+            if max_score > 0.1:  # Only log if there's some detection
+                logger.debug(f"Best detection: {best_model} (score: {max_score:.3f}, threshold: {self.threshold})")
                     
             return False
             
+        except ValueError as e:
+            logger.error(f"Audio data conversion error: {e}")
+            logger.debug(f"Audio chunk length: {len(audio_chunk)} bytes")
+            return False
         except Exception as e:
             logger.error(f"Error during wake word detection: {e}")
             return False

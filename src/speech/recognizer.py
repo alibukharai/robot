@@ -91,25 +91,50 @@ class SpeechRecognizer:
             logger.error("Recognizer not initialized")
             return None
             
-        try:
-            # Process audio data
-            if self.recognizer.AcceptWaveform(audio_data):
-                result = json.loads(self.recognizer.Result())
-            else:
-                result = json.loads(self.recognizer.PartialResult())
-                
-            # Extract text from result
-            text = result.get('text', '').strip()
+        if not audio_data:
+            logger.debug("Empty audio data provided")
+            return None
             
-            if text:
-                logger.info(f"Recognized: '{text}'")
-                return text
+        try:
+            # Process audio data in chunks for better performance
+            chunk_size = 4000  # Process in 4KB chunks
+            results = []
+            
+            # Reset recognizer for clean slate
+            self.reset()
+            
+            for i in range(0, len(audio_data), chunk_size):
+                chunk = audio_data[i:i+chunk_size]
+                
+                if self.recognizer.AcceptWaveform(chunk):
+                    result = json.loads(self.recognizer.Result())
+                    text = result.get('text', '').strip()
+                    if text:
+                        results.append(text)
+                        logger.debug(f"Partial result: '{text}'")
+            
+            # Get final result
+            final_result = json.loads(self.recognizer.FinalResult())
+            final_text = final_result.get('text', '').strip()
+            if final_text:
+                results.append(final_text)
+                logger.debug(f"Final result: '{final_text}'")
+            
+            # Combine all results
+            if results:
+                combined_text = ' '.join(results).strip()
+                logger.info(f"Speech recognized: '{combined_text}'")
+                return combined_text
             else:
-                logger.debug("No speech recognized")
+                logger.debug("No speech content recognized")
                 return None
                 
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error in speech recognition: {e}")
+            return None
         except Exception as e:
             logger.error(f"Error during speech recognition: {e}")
+            logger.debug(f"Audio data length: {len(audio_data)} bytes")
             return None
             
     def recognize_from_file(self, wav_file: str) -> Optional[str]:
@@ -176,6 +201,36 @@ class SpeechRecognizer:
             logger.error(f"Error recognizing from file: {e}")
             return None
             
+    def save_audio_for_debug(self, audio_data: bytes, filename: str = None) -> str:
+        """
+        Save audio data to a WAV file for debugging.
+        
+        Args:
+            audio_data: Raw audio bytes
+            filename: Optional filename, auto-generated if None
+            
+        Returns:
+            Path to saved file
+        """
+        if filename is None:
+            import time
+            timestamp = int(time.time())
+            filename = f"debug_audio_{timestamp}.wav"
+        
+        try:
+            with wave.open(filename, 'wb') as wf:
+                wf.setnchannels(1)  # mono
+                wf.setsampwidth(2)  # 16-bit
+                wf.setframerate(self.sample_rate)
+                wf.writeframes(audio_data)
+            
+            logger.info(f"Debug audio saved to: {filename}")
+            return filename
+            
+        except Exception as e:
+            logger.error(f"Failed to save debug audio: {e}")
+            return ""
+    
     def reset(self) -> None:
         """Reset the recognizer state."""
         if self.model is not None:

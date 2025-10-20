@@ -70,31 +70,81 @@ class Microphone:
         Find the device index for ReSpeaker USB device.
         
         The ReSpeaker Mic Array v2.0 appears as a USB audio device.
-        We search for common identifiers: "ReSpeaker", "XMOS", "USB PnP".
+        We search for common identifiers and prioritize ReSpeaker devices.
         
         Returns:
             Device index if found, None to use default
         """
         # Auto-detect ReSpeaker if no specific name given
         if self.device_name is None:
-            respeaker_keywords = ["respeaker", "xmos", "usb pnp audio"]
+            # Enhanced keywords for better detection on Raspberry Pi
+            respeaker_keywords = [
+                "respeaker", "xmos", "usb pnp audio", "seeed", 
+                "xvf3000", "usb audio", "mic array"
+            ]
             
+            # Store potential matches with priority
+            potential_devices = []
+            
+            logger.info("Scanning for audio input devices...")
             for i in range(self.audio.get_device_count()):
-                info = self.audio.get_device_info_by_index(i)
-                device_name = info.get('name', '').lower()
-                
-                # Check if input device
-                if info.get('maxInputChannels', 0) == 0:
+                try:
+                    info = self.audio.get_device_info_by_index(i)
+                    device_name = info.get('name', '').lower()
+                    max_input_channels = info.get('maxInputChannels', 0)
+                    
+                    # Skip output-only devices
+                    if max_input_channels == 0:
+                        continue
+                    
+                    logger.debug(f"Device {i}: {info.get('name')} - {max_input_channels} input channels")
+                    
+                    # Check for ReSpeaker identifiers with priority
+                    priority = 0
+                    for j, keyword in enumerate(respeaker_keywords):
+                        if keyword in device_name:
+                            priority = len(respeaker_keywords) - j  # Higher priority for earlier keywords
+                            break
+                    
+                    # Special handling for common ReSpeaker device names
+                    if "respeaker" in device_name:
+                        priority += 10
+                    elif "seeed" in device_name:
+                        priority += 8
+                    elif "xmos" in device_name:
+                        priority += 6
+                    elif max_input_channels >= 4:  # Multi-channel devices are likely ReSpeaker
+                        priority += 2
+                    
+                    if priority > 0:
+                        potential_devices.append((priority, i, info))
+                        
+                except Exception as e:
+                    logger.debug(f"Error checking device {i}: {e}")
                     continue
-                
-                # Look for ReSpeaker identifiers
-                for keyword in respeaker_keywords:
-                    if keyword in device_name:
-                        logger.info(f"Auto-detected ReSpeaker: {info.get('name')} (index: {i})")
-                        logger.info(f"Device channels: {info.get('maxInputChannels')}")
-                        return i
             
-            logger.info("ReSpeaker not auto-detected, using default audio input device")
+            # Sort by priority (highest first)
+            potential_devices.sort(reverse=True, key=lambda x: x[0])
+            
+            if potential_devices:
+                priority, device_index, info = potential_devices[0]
+                logger.info(f"Auto-detected audio device: {info.get('name')} (index: {device_index})")
+                logger.info(f"Device channels: {info.get('maxInputChannels')}, Sample rate: {info.get('defaultSampleRate')}")
+                return device_index
+            
+            logger.warning("No ReSpeaker device found, checking for any suitable input device...")
+            
+            # Fallback: find any input device with sufficient channels
+            for i in range(self.audio.get_device_count()):
+                try:
+                    info = self.audio.get_device_info_by_index(i)
+                    if info.get('maxInputChannels', 0) >= 1:
+                        logger.info(f"Using fallback device: {info.get('name')} (index: {i})")
+                        return i
+                except:
+                    continue
+            
+            logger.info("No suitable audio input device found, using system default")
             return None
         
         # Search for user-specified device name
@@ -111,25 +161,88 @@ class Microphone:
         return None
         
     def start_stream(self) -> None:
-        """Start the audio input stream."""
+        """Start the audio input stream with retry logic."""
         if self.stream is not None:
             logger.warning("Stream already started")
             return
             
+        # Try different configurations if the first attempt fails
+        configs_to_try = [
+            # Original configuration
+            {
+                'format': pyaudio.paInt16,
+                'channels': self.channels,
+                'rate': self.sample_rate,
+                'frames_per_buffer': self.chunk_size
+            },
+            # Raspberry Pi friendly configuration
+            {
+                'format': pyaudio.paInt16,
+                'channels': 1,  # Force mono
+                'rate': 16000,  # Force 16kHz
+                'frames_per_buffer': 1024  # Smaller buffer
+            },
+            # More conservative configuration
+            {
+                'format': pyaudio.paInt16,
+                'channels': 1,
+                'rate': 8000,  # Lower sample rate
+                'frames_per_buffer': 512  # Even smaller buffer
+            }
+        ]
+        
+        last_error = None
+        
+        for i, config in enumerate(configs_to_try):
+            try:
+                logger.info(f"Attempting to start audio stream (config {i+1}/3)...")
+                logger.info(f"  Format: {config['format']}")
+                logger.info(f"  Channels: {config['channels']}")
+                logger.info(f"  Sample rate: {config['rate']}")
+                logger.info(f"  Buffer size: {config['frames_per_buffer']}")
+                logger.info(f"  Device index: {self.device_index}")
+                
+                self.stream = self.audio.open(
+                    format=config['format'],
+                    channels=config['channels'],
+                    rate=config['rate'],
+                    input=True,
+                    input_device_index=self.device_index,
+                    frames_per_buffer=config['frames_per_buffer'],
+                    stream_callback=None
+                )
+                
+                # Update instance variables if different config was used
+                if i > 0:
+                    self.channels = config['channels']
+                    self.sample_rate = config['rate']
+                    self.chunk_size = config['frames_per_buffer']
+                    logger.info(f"Updated audio parameters: {self.sample_rate}Hz, {self.channels} channels, {self.chunk_size} buffer")
+                
+                logger.info("Audio stream started successfully")
+                return
+                
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Configuration {i+1} failed: {e}")
+                if i < len(configs_to_try) - 1:
+                    logger.info("Trying next configuration...")
+                continue
+        
+        # If all configurations failed
+        logger.error(f"Failed to start audio stream with all configurations. Last error: {last_error}")
+        
+        # Try to list available devices for debugging
         try:
-            self.stream = self.audio.open(
-                format=pyaudio.paInt16,
-                channels=self.channels,
-                rate=self.sample_rate,
-                input=True,
-                input_device_index=self.device_index,
-                frames_per_buffer=self.chunk_size,
-                stream_callback=None
-            )
-            logger.info("Audio stream started")
-        except Exception as e:
-            logger.error(f"Failed to start audio stream: {e}")
-            raise
+            logger.error("Available audio devices for debugging:")
+            for i in range(self.audio.get_device_count()):
+                info = self.audio.get_device_info_by_index(i)
+                if info.get('maxInputChannels', 0) > 0:
+                    logger.error(f"  [{i}] {info.get('name')} - {info.get('maxInputChannels')} channels")
+        except:
+            pass
+            
+        raise RuntimeError(f"Unable to start audio stream: {last_error}")
             
     def stop_stream(self) -> None:
         """Stop the audio input stream."""
